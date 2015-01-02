@@ -1,1 +1,11 @@
 language: rust
+script:
+  - cargo build
+  - cargo test
+  - cargo bench
+  - cargo doc
+after_success:
+  - test "$TRAVIS_PULL_REQUEST" == false && test "$TRAVIS_BRANCH" == "master" && bash deploy-docs.sh
+env:
+  global:
+    secure: "Tyex9Hh+U/7yR94uVd/1CYMQOwB+vNgyrKeXojIz9bIBiky4H8n+EFIsEr8uX45olzkHCxaEU6I9XnVzO6y38X7XjPaAtH0cqebTXk8gp2Bd6yHne8XBN/CWM31zM/JUBs3Tq4KueJwD41i3PsLVxxjJHdqZ9qpib/ZgAbvcWDo="
