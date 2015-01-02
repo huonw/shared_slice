@@ -9,9 +9,10 @@
 //!
 //! # Examples
 //!
-//! Alice has a long list of numbers of which she needs to know the sum before
-//! she's allowed to enter Wonderland. She's impatient to get there and she has
-//! a computer with many cores so she wants to use all of them.
+//! Alice has a long list of numbers which she needs to sum up before
+//! she's allowed to enter Wonderland. She's impatient to get there
+//! and she has a computer with many cores so she wants to use all of
+//! them.
 //!
 //! Using a `ArcSlice`, she can manually divide up the numbers into
 //! chunks and distribute them across some threads.
