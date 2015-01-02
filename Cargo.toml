@@ -1,0 +1,5 @@
+[package]
+
+name = "shared_slice"
+version = "0.0.1"
+authors = ["Huon Wilson <dbau.pp@gmail.com>"]
