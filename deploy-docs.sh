@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -o errexit -o nounset
 
 rev=$(git rev-parse --short HEAD)
 
