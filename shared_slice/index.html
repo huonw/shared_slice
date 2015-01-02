@@ -44,7 +44,7 @@
 <h1 class='fqn'><span class='in-band'>Crate <a class='mod' href=''>shared_slice</a><wbr></span><span class='out-of-band'><a href='stability.html'>[stability]</a> <span id='render-detail'>
             <a id="collapse-all" href="#">[-]
             </a>&nbsp;<a id="expand-all" href="#">[+]</a>
-        </span><a id='src-0' href='../src/shared_slice/lib.rs.html#1-71'>[src]</a></span></h1>
+        </span><a id='src-0' href='../src/shared_slice/lib.rs.html#1-72'>[src]</a></span></h1>
 <div class='docblock'><p>Thread-local and thread-safe shared slice types, like <code>&amp;[T]</code> but
 without lifetimes.</p>
 
@@ -53,9 +53,10 @@ environments without <code>std</code>.</p>
 
 <h1 id="examples" class='section-header'><a
                            href="#examples">Examples</a></h1>
-<p>Alice has a long list of numbers of which she needs to know the sum before
-she&#39;s allowed to enter Wonderland. She&#39;s impatient to get there and she has
-a computer with many cores so she wants to use all of them.</p>
+<p>Alice has a long list of numbers which she needs to sum up before
+she&#39;s allowed to enter Wonderland. She&#39;s impatient to get there
+and she has a computer with many cores so she wants to use all of
+them.</p>
 
 <p>Using a <code>ArcSlice</code>, she can manually divide up the numbers into
 chunks and distribute them across some threads.</p>
