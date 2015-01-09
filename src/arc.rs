@@ -2,11 +2,11 @@
 
 use core::prelude::*;
 
-use core::{fmt, mem};
+use core::{cmp, fmt, mem, ops};
 use core::borrow::BorrowFrom;
-use core::hash::{mod, Hash};
+use core::hash::{self, Hash};
 
-use alloc::arc::{mod, Arc, Weak};
+use alloc::arc::{self, Arc, Weak};
 use alloc::boxed::Box;
 
 
@@ -23,19 +23,20 @@ use alloc::boxed::Box;
 /// ```rust
 /// use shared_slice::arc::ArcSlice;
 ///
-/// let x = ArcSlice::new(box ["foo", "bar", "baz"]);
-/// println!("{}", x); // [foo, bar, baz]
-/// println!("{}", x.slice(1, 3)); // [bar, baz]
+/// let x = ArcSlice::new(Box::new(["foo", "bar", "baz"]));
+/// println!("{:?}", x); // ["foo", "bar", "baz"]
+/// println!("{:?}", x.slice(1, 3)); // ["bar", "baz"]
 /// ```
 ///
 /// Constructing with a dynamic number of elements:
 ///
 /// ```rust
+/// # #![allow(unstable)]
 /// use shared_slice::arc::ArcSlice;
 ///
 /// let n = 5;
 ///
-/// let v: Vec<u8> = range(0u8, n).collect(); // 0, ..., 4
+/// let v: Vec<u8> = (0u8..n).collect(); // 0, ..., 4
 ///
 /// let x = ArcSlice::new(v.into_boxed_slice());
 /// assert_eq!(&*x, [0, 1, 2, 3, 4]);
@@ -90,7 +91,7 @@ impl<T> ArcSlice<T> {
     ///
     /// Panics if `lo > hi` or if either are strictly greater than
     /// `self.len()`.
-    pub fn slice(mut self, lo: uint, hi: uint) -> ArcSlice<T> {
+    pub fn slice(mut self, lo: usize, hi: usize) -> ArcSlice<T> {
         self.data = unsafe {(&*self.data).slice(lo, hi)};
         self
     }
@@ -104,7 +105,7 @@ impl<T> ArcSlice<T> {
     /// # Panics
     ///
     /// Panics if `hi > self.len()`.
-    pub fn slice_to(self, hi: uint) -> ArcSlice<T> {
+    pub fn slice_to(self, hi: usize) -> ArcSlice<T> {
         self.slice(0, hi)
     }
     /// Construct a new `ArcSlice` that only points to elements at
@@ -117,7 +118,7 @@ impl<T> ArcSlice<T> {
     /// # Panics
     ///
     /// Panics if `lo > self.len()`.
-    pub fn slice_from(self, lo: uint) -> ArcSlice<T> {
+    pub fn slice_from(self, lo: usize) -> ArcSlice<T> {
         let hi = self.len();
         self.slice(lo, hi)
     }
@@ -138,7 +139,8 @@ impl<T> BorrowFrom<ArcSlice<T>> for [T] {
     }
 }
 
-impl<T> Deref<[T]> for ArcSlice<T> {
+impl<T> ops::Deref for ArcSlice<T> {
+    type Target = [T];
     fn deref<'a>(&'a self) -> &'a [T] {
         unsafe {&*self.data}
     }
@@ -151,17 +153,19 @@ impl<T: PartialEq> PartialEq for ArcSlice<T> {
 impl<T: Eq> Eq for ArcSlice<T> {}
 
 impl<T: PartialOrd> PartialOrd for ArcSlice<T> {
-    fn partial_cmp(&self, other: &ArcSlice<T>) -> Option<Ordering> { (**self).partial_cmp(&**other) }
+    fn partial_cmp(&self, other: &ArcSlice<T>) -> Option<cmp::Ordering> {
+        (**self).partial_cmp(&**other)
+    }
     fn lt(&self, other: &ArcSlice<T>) -> bool { **self < **other }
     fn le(&self, other: &ArcSlice<T>) -> bool { **self <= **other }
     fn gt(&self, other: &ArcSlice<T>) -> bool { **self > **other }
     fn ge(&self, other: &ArcSlice<T>) -> bool { **self >= **other }
 }
 impl<T: Ord> Ord for ArcSlice<T> {
-    fn cmp(&self, other: &ArcSlice<T>) -> Ordering { (**self).cmp(&**other) }
+    fn cmp(&self, other: &ArcSlice<T>) -> cmp::Ordering { (**self).cmp(&**other) }
 }
 
-impl<S: hash::Writer, T: Hash<S>> Hash<S> for ArcSlice<T> {
+impl<S: hash::Hasher + hash::Writer, T: Hash<S>> Hash<S> for ArcSlice<T> {
     fn hash(&self, state: &mut S) {
         (**self).hash(state)
     }
@@ -169,7 +173,7 @@ impl<S: hash::Writer, T: Hash<S>> Hash<S> for ArcSlice<T> {
 
 impl<T: fmt::Show> fmt::Show for ArcSlice<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        (**self).fmt(f)
+        fmt::Show::fmt(&**self, f)
     }
 }
 
@@ -209,9 +213,10 @@ impl<T> Drop for ArcSlice<T> {
 mod tests {
     use super::{ArcSlice, WeakSlice};
     use std::cell::Cell;
+    use std::cmp::Ordering;
     #[test]
     fn clone() {
-        let x = ArcSlice::new(box [Cell::new(false)]);
+        let x = ArcSlice::new(Box::new([Cell::new(false)]));
         let y = x.clone();
 
         assert_eq!(x[0].get(), false);
@@ -224,7 +229,7 @@ mod tests {
 
     #[test]
     fn test_upgrade_downgrade() {
-        let x = ArcSlice::new(box [1i]);
+        let x = ArcSlice::new(Box::new([1]));
         let y: WeakSlice<_> = x.downgrade();
 
         assert_eq!(y.upgrade(), Some(x.clone()));
@@ -236,9 +241,9 @@ mod tests {
 
     #[test]
     fn test_total_cmp() {
-        let x = ArcSlice::new(box [1i, 2i, 3i]);
-        let y = ArcSlice::new(box [1i, 2i, 3i]);
-        let z = ArcSlice::new(box [1i, 2i, 4i]);
+        let x = ArcSlice::new(Box::new([1, 2, 3]));
+        let y = ArcSlice::new(Box::new([1, 2, 3]));
+        let z = ArcSlice::new(Box::new([1, 2, 4]));
 
         assert_eq!(x, x);
         assert_eq!(x, y);
@@ -269,10 +274,10 @@ mod tests {
     #[test]
     fn test_partial_cmp() {
         use std::f64;
-        let x = ArcSlice::new(box [1.0, f64::NAN]);
-        let y = ArcSlice::new(box [1.0, f64::NAN]);
-        let z = ArcSlice::new(box [2.0, f64::NAN]);
-        let w = ArcSlice::new(box [f64::NAN, 1.0]);
+        let x = ArcSlice::new(Box::new([1.0, f64::NAN]));
+        let y = ArcSlice::new(Box::new([1.0, f64::NAN]));
+        let z = ArcSlice::new(Box::new([2.0, f64::NAN]));
+        let w = ArcSlice::new(Box::new([f64::NAN, 1.0]));
         assert!(!(x == y));
         assert!(x != y);
 
@@ -304,16 +309,16 @@ mod tests {
 
     #[test]
     fn test_show() {
-        let x = ArcSlice::new(box [1i, 2i]);
-        assert_eq!(format!("{}", x), "[1, 2]");
+        let x = ArcSlice::new(Box::new([1, 2]));
+        assert_eq!(format!("{:?}", x), "[1i32, 2i32]");
 
-        let y: ArcSlice<int> = ArcSlice::new(box []);
-        assert_eq!(format!("{}", y), "[]");
+        let y: ArcSlice<i32> = ArcSlice::new(Box::new([]));
+        assert_eq!(format!("{:?}", y), "[]");
     }
 
     #[test]
     fn test_slice() {
-        let x = ArcSlice::new(box [1i, 2i, 3i]);
+        let x = ArcSlice::new(Box::new([1, 2, 3]));
         let real = [1, 2, 3];
         for i in range(0, 3 + 1) {
             for j in range(i, 3 + 1) {

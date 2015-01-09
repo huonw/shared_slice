@@ -1,4 +1,4 @@
-#![feature(default_type_params, unsafe_destructor, globs)]
+#![feature(unsafe_destructor)]
 #![cfg_attr(not(test), no_std)]
 
 //! Thread-local and thread-safe shared slice types, like `&[T]` but
@@ -18,24 +18,25 @@
 //! chunks and distribute them across some threads.
 //!
 //! ```rust
+//! # #![allow(unstable)]
 //! use shared_slice::arc::ArcSlice;
 //! use std::{cmp, rand, sync};
 //!
 //! // Alice's numbers (the Mad Hatter doesn't care which numbers,
 //! // just that they've been summed up).
-//! let numbers = range(0u, 10_000)
+//! let numbers = (0..10_000)
 //!     .map(|_| rand::random::<u64>() % 100)
 //!     .collect::<Vec<_>>();
 //!
 //!
-//! const NTHREADS: uint = 10;
+//! const NTHREADS: usize = 10;
 //!
 //! let numbers = ArcSlice::new(numbers.into_boxed_slice());
 //!
 //! // number of elements per thread (rounded up)
 //! let per_thread = (numbers.len() + NTHREADS - 1) / NTHREADS;
 //!
-//! let mut futures = range(0, NTHREADS).map(|i| {
+//! let mut futures = (0..NTHREADS).map(|i| {
 //!     // compute the bounds
 //!     let lo = i * per_thread;
 //!     let hi = cmp::min(numbers.len(), lo + per_thread);
@@ -64,6 +65,8 @@
 //! `'static`](https://github.com/rust-lang/rfcs/pull/458), since it
 //! is likely that one will be able to use conventional borrowed
 //! `&[T]` slices directly.)
+
+#![allow(unstable)]
 
 extern crate alloc;
 extern crate core;

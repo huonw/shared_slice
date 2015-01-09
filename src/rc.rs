@@ -2,11 +2,11 @@
 
 use core::prelude::*;
 
-use core::{fmt, mem};
+use core::{cmp, fmt, mem, ops};
 use core::borrow::BorrowFrom;
-use core::hash::{mod, Hash};
+use core::hash::{self, Hash};
 
-use alloc::rc::{mod, Rc, Weak};
+use alloc::rc::{self, Rc, Weak};
 use alloc::boxed::Box;
 
 
@@ -23,19 +23,20 @@ use alloc::boxed::Box;
 /// ```rust
 /// use shared_slice::rc::RcSlice;
 ///
-/// let x = RcSlice::new(box ["foo", "bar", "baz"]);
-/// println!("{}", x); // [foo, bar, baz]
-/// println!("{}", x.slice(1, 3)); // [bar, baz]
+/// let x = RcSlice::new(Box::new(["foo", "bar", "baz"]));
+/// println!("{:?}", x); // ["foo", "bar", "baz"]
+/// println!("{:?}", x.slice(1, 3)); // ["bar", "baz"]
 /// ```
 ///
 /// Constructing with a dynamic number of elements:
 ///
 /// ```rust
+/// # #![allow(unstable)]
 /// use shared_slice::rc::RcSlice;
 ///
 /// let n = 5;
 ///
-/// let v: Vec<u8> = range(0u8, n).collect(); // 0, ..., 4
+/// let v: Vec<u8> = (0u8..n).collect(); // 0, ..., 4
 ///
 /// let x = RcSlice::new(v.into_boxed_slice());
 /// assert_eq!(&*x, [0, 1, 2, 3, 4]);
@@ -85,7 +86,7 @@ impl<T> RcSlice<T> {
     ///
     /// Panics if `lo > hi` or if either are strictly greater than
     /// `self.len()`.
-    pub fn slice(mut self, lo: uint, hi: uint) -> RcSlice<T> {
+    pub fn slice(mut self, lo: usize, hi: usize) -> RcSlice<T> {
         self.data = unsafe {(&*self.data).slice(lo, hi)};
         self
     }
@@ -99,7 +100,7 @@ impl<T> RcSlice<T> {
     /// # Panics
     ///
     /// Panics if `hi > self.len()`.
-    pub fn slice_to(self, hi: uint) -> RcSlice<T> {
+    pub fn slice_to(self, hi: usize) -> RcSlice<T> {
         self.slice(0, hi)
     }
     /// Construct a new `RcSlice` that only points to elements at
@@ -112,7 +113,7 @@ impl<T> RcSlice<T> {
     /// # Panics
     ///
     /// Panics if `lo > self.len()`.
-    pub fn slice_from(self, lo: uint) -> RcSlice<T> {
+    pub fn slice_from(self, lo: usize) -> RcSlice<T> {
         let hi = self.len();
         self.slice(lo, hi)
     }
@@ -133,7 +134,8 @@ impl<T> BorrowFrom<RcSlice<T>> for [T] {
     }
 }
 
-impl<T> Deref<[T]> for RcSlice<T> {
+impl<T> ops::Deref for RcSlice<T> {
+    type Target = [T];
     fn deref<'a>(&'a self) -> &'a [T] {
         unsafe {&*self.data}
     }
@@ -146,17 +148,19 @@ impl<T: PartialEq> PartialEq for RcSlice<T> {
 impl<T: Eq> Eq for RcSlice<T> {}
 
 impl<T: PartialOrd> PartialOrd for RcSlice<T> {
-    fn partial_cmp(&self, other: &RcSlice<T>) -> Option<Ordering> { (**self).partial_cmp(&**other) }
+    fn partial_cmp(&self, other: &RcSlice<T>) -> Option<cmp::Ordering> {
+        (**self).partial_cmp(&**other)
+    }
     fn lt(&self, other: &RcSlice<T>) -> bool { **self < **other }
     fn le(&self, other: &RcSlice<T>) -> bool { **self <= **other }
     fn gt(&self, other: &RcSlice<T>) -> bool { **self > **other }
     fn ge(&self, other: &RcSlice<T>) -> bool { **self >= **other }
 }
 impl<T: Ord> Ord for RcSlice<T> {
-    fn cmp(&self, other: &RcSlice<T>) -> Ordering { (**self).cmp(&**other) }
+    fn cmp(&self, other: &RcSlice<T>) -> cmp::Ordering { (**self).cmp(&**other) }
 }
 
-impl<S: hash::Writer, T: Hash<S>> Hash<S> for RcSlice<T> {
+impl<S: hash::Hasher + hash::Writer, T: Hash<S>> Hash<S> for RcSlice<T> {
     fn hash(&self, state: &mut S) {
         (**self).hash(state)
     }
@@ -204,9 +208,10 @@ impl<T> Drop for RcSlice<T> {
 mod tests {
     use super::{RcSlice, WeakSlice};
     use std::cell::Cell;
+    use std::cmp::Ordering;
     #[test]
     fn clone() {
-        let x = RcSlice::new(box [Cell::new(false)]);
+        let x = RcSlice::new(Box::new([Cell::new(false)]));
         let y = x.clone();
 
         assert_eq!(x[0].get(), false);
@@ -219,7 +224,7 @@ mod tests {
 
     #[test]
     fn test_upgrade_downgrade() {
-        let x = RcSlice::new(box [1i]);
+        let x = RcSlice::new(Box::new([1]));
         let y: WeakSlice<_> = x.downgrade();
 
         assert_eq!(y.upgrade(), Some(x.clone()));
@@ -231,10 +236,9 @@ mod tests {
 
     #[test]
     fn test_total_cmp() {
-        let x = RcSlice::new(box [1i, 2i, 3i]);
-        let y = RcSlice::new(box [1i, 2i, 3i]);
-        let z = RcSlice::new(box [1i, 2i, 4i]);
-
+        let x = RcSlice::new(Box::new([1, 2, 3]));
+        let y = RcSlice::new(Box::new([1, 2, 3]));
+        let z = RcSlice::new(Box::new([1, 2, 4]));
         assert_eq!(x, x);
         assert_eq!(x, y);
         assert!(x != z);
@@ -264,10 +268,10 @@ mod tests {
     #[test]
     fn test_partial_cmp() {
         use std::f64;
-        let x = RcSlice::new(box [1.0, f64::NAN]);
-        let y = RcSlice::new(box [1.0, f64::NAN]);
-        let z = RcSlice::new(box [2.0, f64::NAN]);
-        let w = RcSlice::new(box [f64::NAN, 1.0]);
+        let x = RcSlice::new(Box::new([1.0, f64::NAN]));
+        let y = RcSlice::new(Box::new([1.0, f64::NAN]));
+        let z = RcSlice::new(Box::new([2.0, f64::NAN]));
+        let w = RcSlice::new(Box::new([f64::NAN, 1.0]));
         assert!(!(x == y));
         assert!(x != y);
 
@@ -299,16 +303,16 @@ mod tests {
 
     #[test]
     fn test_show() {
-        let x = RcSlice::new(box [1i, 2i]);
-        assert_eq!(format!("{}", x), "[1, 2]");
+        let x = RcSlice::new(Box::new([1, 2]));
+        assert_eq!(format!("{:?}", x), "[1i32, 2i32]");
 
-        let y: RcSlice<int> = RcSlice::new(box []);
-        assert_eq!(format!("{}", y), "[]");
+        let y: RcSlice<i32> = RcSlice::new(Box::new([]));
+        assert_eq!(format!("{:?}", y), "[]");
     }
 
     #[test]
     fn test_slice() {
-        let x = RcSlice::new(box [1i, 2i, 3i]);
+        let x = RcSlice::new(Box::new([1, 2, 3]));
         let real = [1, 2, 3];
         for i in range(0, 3 + 1) {
             for j in range(i, 3 + 1) {
