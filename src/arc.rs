@@ -92,7 +92,7 @@ impl<T> ArcSlice<T> {
     /// Panics if `lo > hi` or if either are strictly greater than
     /// `self.len()`.
     pub fn slice(mut self, lo: usize, hi: usize) -> ArcSlice<T> {
-        self.data = unsafe {(&*self.data).slice(lo, hi)};
+        self.data = unsafe {&(&*self.data)[lo..hi]};
         self
     }
     /// Construct a new `ArcSlice` that only points to elements at
@@ -171,9 +171,9 @@ impl<S: hash::Hasher + hash::Writer, T: Hash<S>> Hash<S> for ArcSlice<T> {
     }
 }
 
-impl<T: fmt::Show> fmt::Show for ArcSlice<T> {
+impl<T: fmt::Debug> fmt::Debug for ArcSlice<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Show::fmt(&**self, f)
+        fmt::Debug::fmt(&**self, f)
     }
 }
 
@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn test_show() {
         let x = ArcSlice::new(Box::new([1, 2]));
-        assert_eq!(format!("{:?}", x), "[1i32, 2i32]");
+        assert_eq!(format!("{:?}", x), "[1, 2]");
 
         let y: ArcSlice<i32> = ArcSlice::new(Box::new([]));
         assert_eq!(format!("{:?}", y), "[]");
@@ -323,10 +323,10 @@ mod tests {
         for i in range(0, 3 + 1) {
             for j in range(i, 3 + 1) {
                 let slice: ArcSlice<_> = x.clone().slice(i, j);
-                assert_eq!(&*slice, real.slice(i, j));
+                assert_eq!(&*slice, &real[i..j]);
             }
-            assert_eq!(&*x.clone().slice_to(i), real.slice_to(i));
-            assert_eq!(&*x.clone().slice_from(i), real.slice_from(i));
+            assert_eq!(&*x.clone().slice_to(i), &real[..i]);
+            assert_eq!(&*x.clone().slice_from(i), &real[i..]);
         }
     }
 

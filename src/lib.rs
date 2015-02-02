@@ -66,7 +66,7 @@
 //! is likely that one will be able to use conventional borrowed
 //! `&[T]` slices directly.)
 
-#![allow(unstable)]
+#![feature(core, hash, alloc)]
 
 extern crate alloc;
 extern crate core;
