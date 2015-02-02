@@ -44,7 +44,7 @@
 <h1 class='fqn'><span class='in-band'>Crate <a class='mod' href=''>shared_slice</a><wbr></span><span class='out-of-band'><a href='stability.html'>[stability]</a> <span id='render-detail'>
             <a id="collapse-all" href="#">[-]
             </a>&nbsp;<a id="expand-all" href="#">[+]</a>
-        </span><a id='src-0' href='../src/shared_slice/lib.rs.html#1-72'>[src]</a></span></h1>
+        </span><a id='src-0' href='../src/shared_slice/lib.rs.html#1-75'>[src]</a></span></h1>
 <div class='docblock'><p>Thread-local and thread-safe shared slice types, like <code>&amp;[T]</code> but
 without lifetimes.</p>
 
@@ -60,25 +60,25 @@ them.</p>
 
 <p>Using a <code>ArcSlice</code>, she can manually divide up the numbers into
 chunks and distribute them across some threads.</p>
-<pre class='rust '>
+<pre id='rust-example-rendered' class='rust '>
 <span class='kw'>use</span> <span class='ident'>shared_slice</span>::<span class='ident'>arc</span>::<span class='ident'>ArcSlice</span>;
 <span class='kw'>use</span> <span class='ident'>std</span>::{<span class='ident'>cmp</span>, <span class='ident'>rand</span>, <span class='ident'>sync</span>};
 
 <span class='comment'>// Alice&#39;s numbers (the Mad Hatter doesn&#39;t care which numbers,</span>
 <span class='comment'>// just that they&#39;ve been summed up).</span>
-<span class='kw'>let</span> <span class='ident'>numbers</span> <span class='op'>=</span> <span class='ident'>range</span>(<span class='number'>0u</span>, <span class='number'>10_000</span>)
+<span class='kw'>let</span> <span class='ident'>numbers</span> <span class='op'>=</span> (<span class='number'>0</span>..<span class='number'>10_000</span>)
     .<span class='ident'>map</span>(<span class='op'>|</span>_<span class='op'>|</span> <span class='ident'>rand</span>::<span class='ident'>random</span>::<span class='op'>&lt;</span><span class='ident'>u64</span><span class='op'>&gt;</span>() <span class='op'>%</span> <span class='number'>100</span>)
     .<span class='ident'>collect</span>::<span class='op'>&lt;</span><span class='ident'>Vec</span><span class='op'>&lt;</span>_<span class='op'>&gt;&gt;</span>();
 
 
-<span class='kw'>const</span> <span class='ident'>NTHREADS</span>: <span class='ident'>uint</span> <span class='op'>=</span> <span class='number'>10</span>;
+<span class='kw'>const</span> <span class='ident'>NTHREADS</span>: <span class='ident'>usize</span> <span class='op'>=</span> <span class='number'>10</span>;
 
 <span class='kw'>let</span> <span class='ident'>numbers</span> <span class='op'>=</span> <span class='ident'>ArcSlice</span>::<span class='ident'>new</span>(<span class='ident'>numbers</span>.<span class='ident'>into_boxed_slice</span>());
 
 <span class='comment'>// number of elements per thread (rounded up)</span>
 <span class='kw'>let</span> <span class='ident'>per_thread</span> <span class='op'>=</span> (<span class='ident'>numbers</span>.<span class='ident'>len</span>() <span class='op'>+</span> <span class='ident'>NTHREADS</span> <span class='op'>-</span> <span class='number'>1</span>) <span class='op'>/</span> <span class='ident'>NTHREADS</span>;
 
-<span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>futures</span> <span class='op'>=</span> <span class='ident'>range</span>(<span class='number'>0</span>, <span class='ident'>NTHREADS</span>).<span class='ident'>map</span>(<span class='op'>|</span><span class='ident'>i</span><span class='op'>|</span> {
+<span class='kw'>let</span> <span class='kw-2'>mut</span> <span class='ident'>futures</span> <span class='op'>=</span> (<span class='number'>0</span>..<span class='ident'>NTHREADS</span>).<span class='ident'>map</span>(<span class='op'>|</span><span class='ident'>i</span><span class='op'>|</span> {
     <span class='comment'>// compute the bounds</span>
     <span class='kw'>let</span> <span class='ident'>lo</span> <span class='op'>=</span> <span class='ident'>i</span> <span class='op'>*</span> <span class='ident'>per_thread</span>;
     <span class='kw'>let</span> <span class='ident'>hi</span> <span class='op'>=</span> <span class='ident'>cmp</span>::<span class='ident'>min</span>(<span class='ident'>numbers</span>.<span class='ident'>len</span>(), <span class='ident'>lo</span> <span class='op'>+</span> <span class='ident'>per_thread</span>);
