@@ -11,3 +11,5 @@ after_success:
 env:
   global:
     secure: "Tyex9Hh+U/7yR94uVd/1CYMQOwB+vNgyrKeXojIz9bIBiky4H8n+EFIsEr8uX45olzkHCxaEU6I9XnVzO6y38X7XjPaAtH0cqebTXk8gp2Bd6yHne8XBN/CWM31zM/JUBs3Tq4KueJwD41i3PsLVxxjJHdqZ9qpib/ZgAbvcWDo="
+notifications:
+    webhooks: http://huon.me:54856/travis
