@@ -202,9 +202,11 @@ impl<T> Drop for RcSlice<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
     use super::{RcSlice, WeakSlice};
     use std::cell::Cell;
     use std::cmp::Ordering;
+    
     #[test]
     fn clone() {
         let x = RcSlice::new(Box::new([Cell::new(false)]));
@@ -318,5 +320,30 @@ mod tests {
             assert_eq!(&*x.clone().slice_to(i), &real[..i]);
             assert_eq!(&*x.clone().slice_from(i), &real[i..]);
         }
+    }
+
+    #[test]
+    fn test_drop() {
+        let drop_flag = Rc::new(Cell::new(0));
+        struct Foo(Rc<Cell<i32>>);
+
+        impl Drop for Foo {
+            fn drop(&mut self) {
+                let n = self.0.get();
+                self.0.set(n + 1);
+            }
+        }
+
+        let whole = RcSlice::new(Box::new([Foo(drop_flag.clone()), Foo(drop_flag.clone())]));
+
+        drop(whole);
+        assert_eq!(drop_flag.get(), 2);
+
+        drop_flag.set(0);
+
+        let whole = RcSlice::new(Box::new([Foo(drop_flag.clone()), Foo(drop_flag.clone())]));
+        let part = whole.slice(1, 2);
+        drop(part);
+        assert_eq!(drop_flag.get(), 2);
     }
 }
