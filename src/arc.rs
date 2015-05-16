@@ -3,8 +3,7 @@
 use core::prelude::*;
 
 use core::{cmp, fmt, mem, ops};
-use core::borrow::BorrowFrom;
-use core::hash::{self, Hash};
+use core::hash::{Hash, Hasher};
 
 use alloc::arc::{self, Arc, Weak};
 use alloc::boxed::Box;
@@ -133,17 +132,15 @@ impl<T> Clone for ArcSlice<T> {
     }
 }
 
-impl<T> BorrowFrom<ArcSlice<T>> for [T] {
-    fn borrow_from(owned: &ArcSlice<T>) -> &[T] {
-        &**owned
-    }
-}
-
 impl<T> ops::Deref for ArcSlice<T> {
     type Target = [T];
     fn deref<'a>(&'a self) -> &'a [T] {
         unsafe {&*self.data}
     }
+}
+
+impl<T> AsRef<[T]> for ArcSlice<T> {
+    fn as_ref(&self) -> &[T] { &**self }
 }
 
 impl<T: PartialEq> PartialEq for ArcSlice<T> {
@@ -165,9 +162,9 @@ impl<T: Ord> Ord for ArcSlice<T> {
     fn cmp(&self, other: &ArcSlice<T>) -> cmp::Ordering { (**self).cmp(&**other) }
 }
 
-impl<S: hash::Hasher + hash::Writer, T: Hash<S>> Hash<S> for ArcSlice<T> {
-    fn hash(&self, state: &mut S) {
-        (**self).hash(state)
+impl<T: Hash> Hash for ArcSlice<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Hash::hash(&**self, state)
     }
 }
 
@@ -196,7 +193,6 @@ impl<T> WeakSlice<T> {
 // actual allocated data; the deallocation of the counts (which is the
 // only thing a WeakSlice needs to do if it is the very last pointer)
 // is already handled by Arc<()>/Weak<()>.
-#[unsafe_destructor]
 impl<T> Drop for ArcSlice<T> {
     fn drop(&mut self) {
         let strong = arc::strong_count(&self.counts);
@@ -320,8 +316,8 @@ mod tests {
     fn test_slice() {
         let x = ArcSlice::new(Box::new([1, 2, 3]));
         let real = [1, 2, 3];
-        for i in range(0, 3 + 1) {
-            for j in range(i, 3 + 1) {
+        for i in (0..3 + 1) {
+            for j in (i..3 + 1) {
                 let slice: ArcSlice<_> = x.clone().slice(i, j);
                 assert_eq!(&*slice, &real[i..j]);
             }

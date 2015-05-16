@@ -3,8 +3,7 @@
 use core::prelude::*;
 
 use core::{cmp, fmt, mem, ops};
-use core::borrow::BorrowFrom;
-use core::hash::{self, Hash};
+use core::hash::{Hash, Hasher};
 
 use alloc::rc::{self, Rc, Weak};
 use alloc::boxed::Box;
@@ -128,17 +127,15 @@ impl<T> Clone for RcSlice<T> {
     }
 }
 
-impl<T> BorrowFrom<RcSlice<T>> for [T] {
-    fn borrow_from(owned: &RcSlice<T>) -> &[T] {
-        &**owned
-    }
-}
-
 impl<T> ops::Deref for RcSlice<T> {
     type Target = [T];
     fn deref<'a>(&'a self) -> &'a [T] {
         unsafe {&*self.data}
     }
+}
+
+impl<T> AsRef<[T]> for RcSlice<T> {
+    fn as_ref(&self) -> &[T] { &**self }
 }
 
 impl<T: PartialEq> PartialEq for RcSlice<T> {
@@ -160,9 +157,9 @@ impl<T: Ord> Ord for RcSlice<T> {
     fn cmp(&self, other: &RcSlice<T>) -> cmp::Ordering { (**self).cmp(&**other) }
 }
 
-impl<S: hash::Hasher + hash::Writer, T: Hash<S>> Hash<S> for RcSlice<T> {
-    fn hash(&self, state: &mut S) {
-        (**self).hash(state)
+impl<T: Hash> Hash for RcSlice<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Hash::hash(&**self, state)
     }
 }
 
@@ -191,7 +188,6 @@ impl<T> WeakSlice<T> {
 // actual allocated data; the deallocation of the counts (which is the
 // only thing a WeakSlice needs to do if it is the very last pointer)
 // is already handled by Rc<()>/Weak<()>.
-#[unsafe_destructor]
 impl<T> Drop for RcSlice<T> {
     fn drop(&mut self) {
         let strong = rc::strong_count(&self.counts);
@@ -314,8 +310,8 @@ mod tests {
     fn test_slice() {
         let x = RcSlice::new(Box::new([1, 2, 3]));
         let real = [1, 2, 3];
-        for i in range(0, 3 + 1) {
-            for j in range(i, 3 + 1) {
+        for i in (0..3 + 1) {
+            for j in (i..3 + 1) {
                 let slice: RcSlice<_> = x.clone().slice(i, j);
                 assert_eq!(&*slice, &real[i..j]);
             }
