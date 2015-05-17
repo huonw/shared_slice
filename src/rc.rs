@@ -2,10 +2,10 @@
 
 use core::prelude::*;
 
-use core::{cmp, fmt, mem, ops};
+use core::{cmp, fmt, ops};
 use core::hash::{Hash, Hasher};
 
-use alloc::rc::{self, Rc, Weak};
+use alloc::rc::{Rc, Weak};
 use alloc::boxed::Box;
 
 
@@ -42,7 +42,7 @@ use alloc::boxed::Box;
 /// ```
 pub struct RcSlice<T> {
     data: *const [T],
-    counts: Rc<()>,
+    counts: Rc<Box<[T]>>,
 }
 
 /// A non-owning reference-counted slice type.
@@ -52,7 +52,7 @@ pub struct RcSlice<T> {
 /// being deallocated.
 pub struct WeakSlice<T> {
     data: *const [T],
-    counts: Weak<()>,
+    counts: Weak<Box<[T]>>,
 }
 
 impl<T> RcSlice<T> {
@@ -61,8 +61,8 @@ impl<T> RcSlice<T> {
     /// This reuses the allocation of `slice`.
     pub fn new(slice: Box<[T]>) -> RcSlice<T> {
         RcSlice {
-            data: unsafe {mem::transmute(slice)},
-            counts: Rc::new(())
+            data: &*slice,
+            counts: Rc::new(slice),
         }
     }
 
@@ -181,22 +181,6 @@ impl<T> WeakSlice<T> {
                 counts: counts
             }
         })
-    }
-}
-
-// only RcSlice needs a destructor, since it entirely controls the
-// actual allocated data; the deallocation of the counts (which is the
-// only thing a WeakSlice needs to do if it is the very last pointer)
-// is already handled by Rc<()>/Weak<()>.
-impl<T> Drop for RcSlice<T> {
-    fn drop(&mut self) {
-        let strong = rc::strong_count(&self.counts);
-        if strong == 1 {
-            // last one, so let's clean up the stored data
-            unsafe {
-                let _: Box<[T]> = mem::transmute(self.data);
-            }
-        }
     }
 }
 
