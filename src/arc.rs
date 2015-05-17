@@ -2,10 +2,10 @@
 
 use core::prelude::*;
 
-use core::{cmp, fmt, mem, ops};
+use core::{cmp, fmt, ops};
 use core::hash::{Hash, Hasher};
 
-use alloc::arc::{self, Arc, Weak};
+use alloc::arc::{Arc, Weak};
 use alloc::boxed::Box;
 
 
@@ -42,7 +42,7 @@ use alloc::boxed::Box;
 /// ```
 pub struct ArcSlice<T> {
     data: *const [T],
-    counts: Arc<()>,
+    counts: Arc<Box<[T]>>,
 }
 
 unsafe impl<T: Send + Sync> Send for ArcSlice<T> {}
@@ -55,7 +55,7 @@ unsafe impl<T: Send + Sync> Sync for ArcSlice<T> {}
 /// being deallocated.
 pub struct WeakSlice<T> {
     data: *const [T],
-    counts: Weak<()>,
+    counts: Weak<Box<[T]>>,
 }
 unsafe impl<T: Send + Sync> Send for WeakSlice<T> {}
 unsafe impl<T: Send + Sync> Sync for WeakSlice<T> {}
@@ -66,8 +66,8 @@ impl<T> ArcSlice<T> {
     /// This reuses the allocation of `slice`.
     pub fn new(slice: Box<[T]>) -> ArcSlice<T> {
         ArcSlice {
-            data: unsafe {mem::transmute(slice)},
-            counts: Arc::new(())
+            data: &*slice,
+            counts: Arc::new(slice),
         }
     }
 
@@ -189,25 +189,10 @@ impl<T> WeakSlice<T> {
     }
 }
 
-// only ArcSlice needs a destructor, since it entirely controls the
-// actual allocated data; the deallocation of the counts (which is the
-// only thing a WeakSlice needs to do if it is the very last pointer)
-// is already handled by Arc<()>/Weak<()>.
-impl<T> Drop for ArcSlice<T> {
-    fn drop(&mut self) {
-        let strong = arc::strong_count(&self.counts);
-        if strong == 1 {
-            // last one, so let's clean up the stored data
-            unsafe {
-                let _: Box<[T]> = mem::transmute(self.data);
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{ArcSlice, WeakSlice};
+    use std::sync::{Arc, Mutex};
     use std::cell::Cell;
     use std::cmp::Ordering;
     #[test]
@@ -336,5 +321,30 @@ mod tests {
         assert_sync::<ArcSlice<u8>>();
         assert_send::<WeakSlice<u8>>();
         assert_sync::<WeakSlice<u8>>();
+    }
+
+    #[test]
+    fn test_drop() {
+        let drop_flag = Arc::new(Mutex::new(0));
+        struct Foo(Arc<Mutex<i32>>);
+
+        impl Drop for Foo {
+            fn drop(&mut self) {
+                let mut n = self.0.lock().unwrap();
+                *n += 1;
+            }
+        }
+
+        let whole = ArcSlice::new(Box::new([Foo(drop_flag.clone()), Foo(drop_flag.clone())]));
+
+        drop(whole);
+        assert_eq!(*drop_flag.lock().unwrap(), 2);
+
+        *drop_flag.lock().unwrap() = 0;
+
+        let whole = ArcSlice::new(Box::new([Foo(drop_flag.clone()), Foo(drop_flag.clone())]));
+        let part = whole.slice(1, 2);
+        drop(part);
+        assert_eq!(*drop_flag.lock().unwrap(), 2);
     }
 }
