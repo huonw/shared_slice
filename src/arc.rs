@@ -91,7 +91,7 @@ impl<T> ArcSlice<T> {
     /// Panics if `lo > hi` or if either are strictly greater than
     /// `self.len()`.
     pub fn slice(mut self, lo: usize, hi: usize) -> ArcSlice<T> {
-        self.data = unsafe {&(&*self.data)[lo..hi]};
+        self.data = &self[lo..hi];
         self
     }
     /// Construct a new `ArcSlice` that only points to elements at

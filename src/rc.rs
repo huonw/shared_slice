@@ -86,7 +86,7 @@ impl<T> RcSlice<T> {
     /// Panics if `lo > hi` or if either are strictly greater than
     /// `self.len()`.
     pub fn slice(mut self, lo: usize, hi: usize) -> RcSlice<T> {
-        self.data = unsafe {&(&*self.data)[lo..hi]};
+        self.data = &self[lo..hi];
         self
     }
     /// Construct a new `RcSlice` that only points to elements at
