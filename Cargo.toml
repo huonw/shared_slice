@@ -15,3 +15,7 @@ Thread-local and thread-safe shared slice types, like `&[T]` but
 without lifetimes. This library depends only on `alloc` and `core`, so
 can be used in environments without `std`.
 """
+
+[dev-dependencies]
+
+rand = "0.3"

@@ -1,4 +1,4 @@
-#![feature(unsafe_destructor)]
+#![feature(no_std)]
 #![cfg_attr(not(test), no_std)]
 
 //! Thread-local and thread-safe shared slice types, like `&[T]` but
@@ -18,9 +18,14 @@
 //! chunks and distribute them across some threads.
 //!
 //! ```rust
-//! # #![allow(unstable)]
+//! #![feature(std_misc)]
+//! extern crate shared_slice;
+//! extern crate rand;
+//!
 //! use shared_slice::arc::ArcSlice;
-//! use std::{cmp, rand, sync};
+//! use std::{cmp, sync};
+//!
+//! # fn main() {
 //!
 //! // Alice's numbers (the Mad Hatter doesn't care which numbers,
 //! // just that they've been summed up).
@@ -58,6 +63,8 @@
 //! let sum = futures.iter_mut().fold(0, |a, b| a + b.get());
 //!
 //! println!("the sum is {}", sum);
+//!
+//! # }
 //! ```
 //!
 //! (NB. `ArcSlice` may become unnecessary for situations like this if
@@ -66,7 +73,7 @@
 //! is likely that one will be able to use conventional borrowed
 //! `&[T]` slices directly.)
 
-#![feature(core, hash, alloc)]
+#![feature(core, alloc)]
 
 extern crate alloc;
 extern crate core;

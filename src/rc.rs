@@ -2,11 +2,10 @@
 
 use core::prelude::*;
 
-use core::{cmp, fmt, mem, ops};
-use core::borrow::BorrowFrom;
-use core::hash::{self, Hash};
+use core::{cmp, fmt, ops};
+use core::hash::{Hash, Hasher};
 
-use alloc::rc::{self, Rc, Weak};
+use alloc::rc::{Rc, Weak};
 use alloc::boxed::Box;
 
 
@@ -43,7 +42,7 @@ use alloc::boxed::Box;
 /// ```
 pub struct RcSlice<T> {
     data: *const [T],
-    counts: Rc<()>,
+    counts: Rc<Box<[T]>>,
 }
 
 /// A non-owning reference-counted slice type.
@@ -53,7 +52,7 @@ pub struct RcSlice<T> {
 /// being deallocated.
 pub struct WeakSlice<T> {
     data: *const [T],
-    counts: Weak<()>,
+    counts: Weak<Box<[T]>>,
 }
 
 impl<T> RcSlice<T> {
@@ -62,8 +61,8 @@ impl<T> RcSlice<T> {
     /// This reuses the allocation of `slice`.
     pub fn new(slice: Box<[T]>) -> RcSlice<T> {
         RcSlice {
-            data: unsafe {mem::transmute(slice)},
-            counts: Rc::new(())
+            data: &*slice,
+            counts: Rc::new(slice),
         }
     }
 
@@ -87,7 +86,7 @@ impl<T> RcSlice<T> {
     /// Panics if `lo > hi` or if either are strictly greater than
     /// `self.len()`.
     pub fn slice(mut self, lo: usize, hi: usize) -> RcSlice<T> {
-        self.data = unsafe {&(&*self.data)[lo..hi]};
+        self.data = &self[lo..hi];
         self
     }
     /// Construct a new `RcSlice` that only points to elements at
@@ -128,17 +127,15 @@ impl<T> Clone for RcSlice<T> {
     }
 }
 
-impl<T> BorrowFrom<RcSlice<T>> for [T] {
-    fn borrow_from(owned: &RcSlice<T>) -> &[T] {
-        &**owned
-    }
-}
-
 impl<T> ops::Deref for RcSlice<T> {
     type Target = [T];
     fn deref<'a>(&'a self) -> &'a [T] {
         unsafe {&*self.data}
     }
+}
+
+impl<T> AsRef<[T]> for RcSlice<T> {
+    fn as_ref(&self) -> &[T] { &**self }
 }
 
 impl<T: PartialEq> PartialEq for RcSlice<T> {
@@ -160,9 +157,9 @@ impl<T: Ord> Ord for RcSlice<T> {
     fn cmp(&self, other: &RcSlice<T>) -> cmp::Ordering { (**self).cmp(&**other) }
 }
 
-impl<S: hash::Hasher + hash::Writer, T: Hash<S>> Hash<S> for RcSlice<T> {
-    fn hash(&self, state: &mut S) {
-        (**self).hash(state)
+impl<T: Hash> Hash for RcSlice<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Hash::hash(&**self, state)
     }
 }
 
@@ -187,28 +184,13 @@ impl<T> WeakSlice<T> {
     }
 }
 
-// only RcSlice needs a destructor, since it entirely controls the
-// actual allocated data; the deallocation of the counts (which is the
-// only thing a WeakSlice needs to do if it is the very last pointer)
-// is already handled by Rc<()>/Weak<()>.
-#[unsafe_destructor]
-impl<T> Drop for RcSlice<T> {
-    fn drop(&mut self) {
-        let strong = rc::strong_count(&self.counts);
-        if strong == 1 {
-            // last one, so let's clean up the stored data
-            unsafe {
-                let _: Box<[T]> = mem::transmute(self.data);
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
     use super::{RcSlice, WeakSlice};
     use std::cell::Cell;
     use std::cmp::Ordering;
+    
     #[test]
     fn clone() {
         let x = RcSlice::new(Box::new([Cell::new(false)]));
@@ -314,13 +296,38 @@ mod tests {
     fn test_slice() {
         let x = RcSlice::new(Box::new([1, 2, 3]));
         let real = [1, 2, 3];
-        for i in range(0, 3 + 1) {
-            for j in range(i, 3 + 1) {
+        for i in (0..3 + 1) {
+            for j in (i..3 + 1) {
                 let slice: RcSlice<_> = x.clone().slice(i, j);
                 assert_eq!(&*slice, &real[i..j]);
             }
             assert_eq!(&*x.clone().slice_to(i), &real[..i]);
             assert_eq!(&*x.clone().slice_from(i), &real[i..]);
         }
+    }
+
+    #[test]
+    fn test_drop() {
+        let drop_flag = Rc::new(Cell::new(0));
+        struct Foo(Rc<Cell<i32>>);
+
+        impl Drop for Foo {
+            fn drop(&mut self) {
+                let n = self.0.get();
+                self.0.set(n + 1);
+            }
+        }
+
+        let whole = RcSlice::new(Box::new([Foo(drop_flag.clone()), Foo(drop_flag.clone())]));
+
+        drop(whole);
+        assert_eq!(drop_flag.get(), 2);
+
+        drop_flag.set(0);
+
+        let whole = RcSlice::new(Box::new([Foo(drop_flag.clone()), Foo(drop_flag.clone())]));
+        let part = whole.slice(1, 2);
+        drop(part);
+        assert_eq!(drop_flag.get(), 2);
     }
 }
